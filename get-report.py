@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-'''
+"""
 A script to download specific reports from OneTrust.
 
 Requires selenium.
 Chromedriver executable must be in the PATH.
-'''
+"""
 import getpass
 import os
 from selenium import webdriver
@@ -22,10 +22,11 @@ okta_password = ""  # getpass.getpass("Enter okta password: ")
 ot_url = "https://uat.onetrust.com/"
 rpt_url = "https://uat.onetrust.com/reporting/column/60d900aa99845310d8a94078"
 
+
 def newChromeDriver(downloadPath=None) -> webdriver.Chrome:
-    '''
+    """
     Initiates a new chrome driver with the specified download path for saving files.
-    '''
+    """
     options = webdriver.ChromeOptions()
     options.add_argument("--ignore-certificate-errors")
     options.add_argument("--incognito")
@@ -47,13 +48,13 @@ with newChromeDriver("/Users/justin/Desktop/onetrust") as driver:
     # Navigate to the specified URL.
     driver.get(ot_url)
 
-    print("** searching for + filling in the auth login field")
+    # Wait for page to full load before attempting to login.
     driver_wait.until(EC.presence_of_element_located((By.ID, "ot_form-element_0")))
     username_element = driver.find_element_by_id("ot_form-element_0")
     username_element.send_keys(email_address)
     username_element.submit()
 
-    print("** waiting for okta login form, then submitting okta username/password")
+    # Process Okta login flow.
     driver_wait.until(EC.presence_of_element_located((By.ID, "okta-signin-username")))
     driver_wait.until(EC.presence_of_element_located((By.ID, "okta-signin-password")))
 
@@ -63,32 +64,37 @@ with newChromeDriver("/Users/justin/Desktop/onetrust") as driver:
     okta_password_element.send_keys(okta_password)
     okta_password_element.submit()
 
-    print("** waiting for main OneTrust app portal to load")
+    # Wait for login to complete and OneTrust to fully load.
     driver_wait.until(EC.presence_of_element_located((By.ID, "MyApps")))
 
+    # Navigate to report URL
     driver.get(rpt_url)
-    print("** waiting for report to load")
+
+    # Select report organized by Subtask
     driver_wait.until(
         EC.presence_of_element_located((By.XPATH, "//a[contains(., 'DSAR Subtask')]"))
     )
     driver.find_element_by_xpath("//a[contains(., 'DSAR Subtask')]").click()
 
+    # Wait for export button to be available, then click it.
     driver_wait.until(
         EC.presence_of_element_located((By.XPATH, "//button[contains(., 'Export')]"))
     )
     driver.find_element_by_xpath("//button[contains(., 'Export')]").click()
 
+    # Close modal dialog.
     driver_wait.until(
         EC.presence_of_element_located((By.XPATH, "//button[contains(., 'Close')]"))
     )
     driver.find_element_by_xpath("//button[contains(., 'Close')]").click()
-    print("** waiting for export to be ready")
+
+    # This is currently a race condition, assuming the report will be ready in 15s or less.
     sleep(15)
 
-    print("** downloading")
+    # Click the notification icon to expand the list.
     driver.find_element_by_xpath(
         "//button[contains(@class, 'gh-notification-action')]"
     ).click()
-    driver.find_element_by_xpath(
-        "//button[contains(@class, 'nf-notification-card__item')]"
-    ).click()
+
+    # Find and click the top Report Export button.
+    driver.find_element_by_xpath("//p[contains(., 'Report Export')]").click()
