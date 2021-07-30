@@ -8,6 +8,7 @@ Requires selenium and chromedriver.
 import configparser
 import json
 import os
+import traceback
 from datetime import datetime
 
 import arrow
@@ -20,7 +21,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from onetrust.api import OneTrustSession
 
-OT_INSTANCE_URL = "https://uat.onetrust.com"
 BROWSER_WAIT_TIMEOUT_IN_S = 30
 now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -36,28 +36,54 @@ Please take action on this subtask as soon as possible to avoid potential SLA vi
 If you have any questions, contact the ISM Team.
 """
 
-NO_GROUP_TEMPLATE = """
+NO_GROUP_TEMPLATE = """Hello--
+The following subtask was due {}, but it is not assigned to a group.
+
+Subtask Name: {}
+Subtask ID: {}
+Due Date: {}
+
+Please investigate this subtask status and ensure that action is taken as soon as possible.
 """
 
-def readable_time(time) -> str:
+
+def readable_time(time: str) -> str:
+    """Converts an ISO-formatted time string into a human readable format.
+    Example: 12 hours ago"""
     a = arrow.get(time)
     a.to("America/New_York")
     a = a.humanize()
     return a
 
-def utc_to_local(time) -> str:
+
+def utc_to_local(time: str) -> str:
+    """Converts an ISO-formatted time string from UTC to local time."""
     a = arrow.get(time)
     a.to("America/New_York")
     return a.datetime.strftime("%Y-%m-%d")
 
-def send_email(aws_region, sender, receiver, subject, message) -> None:
+
+def send_email(
+    aws_region: str, sender: str, receiver: list, subject: str, message: str
+) -> None:
+    """Sends an email using the AWS SES API.
+    If not run in Lamba, requires AWS credentials in ~/.aws/credentials
+
+    Args:
+        aws_region (str): the AWS region to connect to
+        sender (str): the sender's email formatted as: Pretty Name (email@address.com)
+        receiver (list): A list containing recipient emails, without pretty names
+        subject (str): The subject line of the email
+        message (str): A plain-text formatted message body
+    """
+    # Create the email client.
     client = boto3.client("ses", region_name=aws_region)
+
+    # Send the message.
     try:
         client.send_email(
             Destination={
-                "ToAddresses": [
-                    receiver,
-                ],
+                "ToAddresses": receiver,
             },
             Message={
                 "Body": {
@@ -74,15 +100,26 @@ def send_email(aws_region, sender, receiver, subject, message) -> None:
             Source=sender,
         )
     except ClientError as e:
-        print(e.response['Error']['Message'])
+        print(e.response["Error"]["Message"])
 
-def get_secret(secret_name, region) -> str:
-    """Retrieves a secret from AWS Secrets Manager."""
+
+def get_secret(secret_name: str, region: str) -> str:
+    """Retrieves a secret from AWS Secrets Manager.
+    Not intended to retrieve binary or base64 secrets.
+
+    Args:
+        secret_name (str): the name of the secret, for example prod/MyApp/SomeSecret
+        region (str): the AWS region that Secrets Manager is running in
+
+    Returns:
+        str: The contents of the secret, as a string.
+    """
 
     # Create a Secrets Manager client
     session = boto3.session.Session()
     client = session.client(service_name="secretsmanager", region_name=region)
 
+    # Retrieve the secret
     try:
         get_secret_value_response = client.get_secret_value(SecretId=secret_name)
     except ClientError as e:
@@ -92,10 +129,18 @@ def get_secret(secret_name, region) -> str:
         return secret
 
 
-def newChromeDriver(downloadPath=None) -> webdriver.Chrome:
+def newChromeDriver(downloadPath: str = None) -> webdriver.Chrome:
+    """Instantiates a new chrome driver.
+
+    Args:
+        downloadPath (str): (Optional) the path to save downloads.
+
+    Returns:
+        webdriver.Chrome: the configured chrome driver instance
     """
-    Initiates a new chrome driver with the specified download path for saving files.
-    """
+
+    # These options are REQUIRED for running Chrome under Lambda
+    # DO NOT CHANGE
     options = webdriver.ChromeOptions()
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--headless")
@@ -106,9 +151,16 @@ def newChromeDriver(downloadPath=None) -> webdriver.Chrome:
     options.add_argument("--disable-dev-tools")
     options.add_argument("--no-zygote")
     options.add_argument("--user-data-dir=/tmp/chrome-user-data")
+    options.add_argument(
+        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/87.0.4280.88 Safari/537.36"
+    )
 
-    options.binary_location = '/opt/chrome/chrome'
+    # use the downloaded version of chrome
+    options.binary_location = "/opt/chrome/chrome"
 
+    # Set the download path if necessary
     if downloadPath is not None:
         prefs = {}
         os.makedirs(downloadPath, exist_ok=True)
@@ -116,18 +168,37 @@ def newChromeDriver(downloadPath=None) -> webdriver.Chrome:
         prefs["download.default_directory"] = downloadPath
         options.add_experimental_option("prefs", prefs)
 
-    driver = webdriver.Chrome("/opt/chromedriver/chromedriver", options=options)
+    # Create the driver using the options above.
+    # If running in docker, use the installed version of chromedriver
+    driver = webdriver.Chrome(
+        "/opt/chromedriver/chromedriver",
+        options=options,
+    )
     return driver
 
 
-def get_token(url, email, okta_user, okta_pass) -> tuple:
+def get_session(url: str, email: str, okta_user: str, okta_pass: str) -> tuple:
+    """Retrieves the OneTrust access_token and session cookies via chromedriver.
+
+    Args:
+        url (str): the URL of the OneTrust instance to log in to
+        email (str): the email address of the OneTrust account
+        okta_user (str): the Scholastic network account to log in to Okta
+        okta_pass (str): password for Okta login
+
+    Returns:
+        tuple[str, dict]: A tuple containing the access_token (str) and session cookies (dict)
+    """
+
+    # Instantiate a new chrome driver for the login.
     with newChromeDriver() as driver:
+        # Create a waiter to pause execution while waiting for elements to load.
         driver_wait = WebDriverWait(driver, BROWSER_WAIT_TIMEOUT_IN_S)
 
         # Navigate to the specified URL.
         driver.get(url)
 
-        # Wait for page to full load before attempting to login.
+        # Wait for page to fully load before attempting to log in.
         driver_wait.until(EC.presence_of_element_located((By.ID, "ot_form-element_0")))
         username_element = driver.find_element_by_id("ot_form-element_0")
         username_element.send_keys(email)
@@ -150,14 +221,24 @@ def get_token(url, email, okta_user, okta_pass) -> tuple:
         # Wait for login to complete and OneTrust to fully load.
         driver_wait.until(EC.presence_of_element_located((By.ID, "MyApps")))
 
+        # Snag session information
         local_storage = driver.execute_script("return window.localStorage;")
         access_token = local_storage["access_token"]
 
         return access_token, driver.get_cookies()
 
 
-def main(event, context):
-    # Gather config information.
+def main(event, context) -> str:
+    """The entry point for the script.
+
+    Args:
+        event, context: required for Lambda functionality, but unused.
+
+    Returns:
+        str: a status message, will be logged in CloudWatch.
+    """
+
+    # Load configuration from file
     try:
         config = configparser.ConfigParser()
         config.read("onetrust.cfg")
@@ -169,40 +250,60 @@ def main(event, context):
         okta_user = config["okta"]["user"]
         admin_email = config["onetrust"]["admin_email"]
     except OSError as e:
-        print("OS error: {0}".format(e))
+        return f"OS error: {e}"
     except ConfigParseError as e:
-        print("Config parsing error: {0}".format(e))
+        return f"Config parsing error: {e}"
 
     # Retrieve Okta password from AWS
     okta_pw = json.loads(get_secret(aws_secret, aws_region))["okta_pw"]
 
-    # Get access_token from OneTrust session
-    access_token, cookies = get_token(ot_url, ot_email, okta_user, okta_pw)
+    # Get access_token and cookies from OneTrust session
+    access_token, cookies = get_session(ot_url, ot_email, okta_user, okta_pw)
 
     # get overdue subtask info
-    ot = OneTrustSession(access_token, cookies, OT_INSTANCE_URL)
+    ot = OneTrustSession(access_token, cookies, ot_url)
     r = ot.get_overdue_subtasks(now)
     subtasks = r.json()
 
     # Notify on each overdue subtask
     for s in subtasks["content"]:
+        subtask_name = s["subTaskName"]
+        subtask_id = s["subTaskId"]
+        due_date = s["subTaskDeadline"]
+
         if s["subTaskAssignee"] is None:
-            # TODO: Send alert email to Admins only
-            pass
-        else:
-            # TODO: Send alert to Admins and assignees
-            emails = ot.get_group_email(ot.get_group_id(s["subTaskAssignee"]))
-            emails.append(admin_email)
-            subtask_name = s["subTaskName"]
-            subtask_id = s["subTaskId"]
-            due_date = s["subTaskDeadline"]
+            emails = [
+                admin_email,
+            ]
             send_email(
                 aws_region,
                 f"OneTrust Admin <{admin_email}>",
-                "justin@afakecompany.com",
+                emails,
                 "Overdue OneTrust Subtask",
-                GROUP_TEMPLATE.format(subtask_name, subtask_id, readable_time(due_date), utc_to_local(due_date)),
+                NO_GROUP_TEMPLATE.format(
+                    readable_time(due_date),
+                    subtask_name,
+                    subtask_id,
+                    utc_to_local(due_date),
+                ),
             )
+        else:
+            emails = ot.get_group_email(ot.get_group_id(s["subTaskAssignee"]))
+            emails.append(admin_email)
+            send_email(
+                aws_region,
+                f"OneTrust Admin <{admin_email}>",
+                emails,
+                "Overdue OneTrust Subtask",
+                GROUP_TEMPLATE.format(
+                    subtask_name,
+                    subtask_id,
+                    readable_time(due_date),
+                    utc_to_local(due_date),
+                ),
+            )
+
+    return "done"
 
 
 if __name__ == "__main__":
