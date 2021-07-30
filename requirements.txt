@@ -1,0 +1,4 @@
+arrow == 1.1.1
+boto3 == 1.18.10
+requests == 2.26.0
+selenium == 3.141.0
