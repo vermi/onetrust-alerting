@@ -2,6 +2,8 @@ FROM amazon/aws-lambda-python:3.8
 
 COPY get-report-via-api.py ${LAMBDA_TASK_ROOT}/app.py
 COPY onetrust ${LAMBDA_TASK_ROOT}/onetrust
+COPY aws_local ${LAMBDA_TASK_ROOT}/aws_local
+COPY templates ${LAMBDA_TASK_ROOT}/templates
 COPY onetrust.cfg ${LAMBDA_TASK_ROOT}
 
 COPY requirements.txt /tmp/
