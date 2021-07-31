@@ -6,7 +6,7 @@
 
 You can easily run the script locally as well, but the results may not be in line with what you would expect if running via docker.
 
-Simply comment out lines 161 and 162 in get-report-via-api.py and execute the script.
+Simply comment out lines 76 and 77 in get-report-via-api.py and execute the script.
 This assumes that both chrome and chromedriver are accessible from PATH. Otherwise, specify your install paths.
 
 ### Docker Testing Instructions
