@@ -1,8 +1,8 @@
 Hello--
-The following subtask was due {}, but it is not assigned to a group.
+The following subtask was due ${relative_time}, but it is not assigned to a group.
 
-Subtask Name: {}
-Subtask ID: {}
-Due Date: {}
+Subtask Name: ${subtask_name}
+Subtask ID: ${subtask_id}
+Due Date: ${due_date}
 
 Please investigate this subtask status and ensure that action is taken as soon as possible.

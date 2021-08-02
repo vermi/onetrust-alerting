@@ -1,9 +1,9 @@
 Hello--
-You are receiving this email because you are assigned to the following subtask, which is overdue:
+You are receiving this email because you are assigned to the following subtask, which was due ${relative_time}:
 
-Subtask Name: {}
-Subtask ID: {}
-Due Date: {} ({})
+Subtask Name: ${subtask_name}
+Subtask ID: ${subtask_id}
+Due Date: ${due_date}
 
 Please take action on this subtask as soon as possible to avoid potential SLA violations and regulatory fines.
 

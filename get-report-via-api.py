@@ -8,6 +8,7 @@ Requires selenium and chromedriver.
 import configparser
 import json
 from datetime import datetime
+from string import Template
 
 import arrow
 
@@ -15,6 +16,8 @@ from aws_local.tools import ConfigParseError, get_secret, send_email
 from onetrust.api import OnetrustService, OnetrustSession
 
 BROWSER_WAIT_TIMEOUT_IN_S = 30
+PATH_TO_CHROME = "/opt/chrome/chrome"
+PATH_TO_DRIVER = "/opt/chromedriver/chromedriver"
 
 
 def readable_time(time: str) -> str:
@@ -59,9 +62,9 @@ def main(event, context) -> str:
         admin_email = config["onetrust"]["admin_email"]
 
         with open(config["templates"]["group"]) as f:
-            group_template = f.read()
+            group_template = Template(f.read())
         with open(config["templates"]["orphan"]) as f:
-            orphan_template = f.read()
+            orphan_template = Template(f.read())
 
     except OSError as e:
         return f"OS error: {e}"
@@ -73,8 +76,8 @@ def main(event, context) -> str:
     sess = OnetrustSession(
         ot_url,
         ot_credentials,
-        chrome_path="/opt/chrome/chrome",
-        driver_path="/opt/chromedriver/chromedriver",
+        chrome_path=PATH_TO_CHROME,
+        driver_path=PATH_TO_DRIVER,
         timeout=BROWSER_WAIT_TIMEOUT_IN_S,
     )
     ot = OnetrustService(sess)
@@ -97,11 +100,11 @@ def main(event, context) -> str:
                 f"OneTrust Admin <{admin_email}>",
                 emails,
                 "Overdue OneTrust Subtask",
-                orphan_template.format(
-                    readable_time(due_date),
-                    subtask_name,
-                    subtask_id,
-                    utc_to_local(due_date),
+                orphan_template.substitute(
+                    subtask_name=subtask_name,
+                    subtask_id=subtask_id,
+                    relative_time=readable_time(due_date),
+                    due_date=utc_to_local(due_date),
                 ),
             )
         else:
@@ -112,11 +115,11 @@ def main(event, context) -> str:
                 f"OneTrust Admin <{admin_email}>",
                 emails,
                 "Overdue OneTrust Subtask",
-                group_template.format(
-                    subtask_name,
-                    subtask_id,
-                    readable_time(due_date),
-                    utc_to_local(due_date),
+                group_template.substitute(
+                    subtask_name=subtask_name,
+                    subtask_id=subtask_id,
+                    relative_time=readable_time(due_date),
+                    due_date=utc_to_local(due_date),
                 ),
             )
 
