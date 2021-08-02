@@ -1,5 +1,11 @@
 # OneTrust Alerting Script
 
+## Templates
+
+This script makes use of Python's built-in string.Template. Documentation is available at https://docs.python.org/3/library/string.html#template-strings.
+
+I've opted to use \${} notation for easier identification of substitutions. The dollar sign can be escaped using a double sign, example: The burger costs \$\$10.
+
 ## Testing
 
 ### Run the script locally
