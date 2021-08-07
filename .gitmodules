@@ -1,0 +1,6 @@
+[submodule "awstools"]
+	path = awstools
+	url = git@github.com:vermi/awstools.git
+[submodule "onetrust"]
+	path = onetrust
+	url = git@github.com:vermi/onetrust.git
