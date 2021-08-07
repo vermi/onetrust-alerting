@@ -10,8 +10,7 @@ git submodule update
 
 ## Templates
 
-This script makes use of Python's built-in [string.Template][1].
-[1]: <https://docs.python.org/3/library/string.html#template-strings> "string.Template Documentation."
+This script makes use of Python's built-in [string.Template](https://docs.python.org/3/library/string.html#template-strings).
 
 I've opted to use ${} notation for easier identification of substitutions. The dollar sign can be escaped using a double sign, example: The burger costs $$10.
 
