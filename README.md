@@ -1,5 +1,13 @@
 # OneTrust Alerting Script
 
+## Cloning
+
+```shell
+git clone <this repo>
+git submodule init
+git submodule update
+```
+
 ## Templates
 
 This script makes use of Python's built-in string.Template. Documentation is available at https://docs.python.org/3/library/string.html#template-strings.
