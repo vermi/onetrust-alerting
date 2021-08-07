@@ -12,7 +12,7 @@ from string import Template
 
 import arrow
 
-from aws_local.tools import ConfigParseError, get_secret, send_email
+from awstools.tools import ConfigParseError, get_secret, send_email
 from onetrust.api import OnetrustService, OnetrustSession
 
 BROWSER_WAIT_TIMEOUT_IN_S = 30
